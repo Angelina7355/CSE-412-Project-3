@@ -166,21 +166,19 @@ class AsynchronousValueIterationAgent(ValueIterationAgent):
 
     def runValueIteration(self):
         "*** YOUR CODE HERE ***"
+        # Save all states to a variable to be indexed in loop
         states = self.mdp.getStates()
+
         # Run value iteration for every iteration
         for i in range(self.iterations):
-
-            # Keep current iteration's values
-            newQValues = util.Counter()
-
-            # Get best qValue for each state in current iteration
+            # Get best qValue for only the specified state for the current iteration (asynchronous)
             state = states[i % len(states)]
             if not self.mdp.isTerminal(state):
                 actions = self.mdp.getPossibleActions(state)
                 if actions:
                     qValues = [self.computeQValueFromValues(state, action) for action in actions]
                     self.values[state] = max(qValues)
-                else:
+                else:   # Q-Value should be -infinity when no actions are found
                     self.values[state] = float('-inf')
 
 class PrioritizedSweepingValueIterationAgent(AsynchronousValueIterationAgent):
@@ -202,4 +200,62 @@ class PrioritizedSweepingValueIterationAgent(AsynchronousValueIterationAgent):
 
     def runValueIteration(self):
         "*** YOUR CODE HERE ***"
+        # Create a dictionary to hold a set of predecessors for each state
+        predecessors = dict()
+        for state in self.mdp.getStates():
+            predecessors[state] = set()
+
+        # Create a priority queue to keep track of each state's values and priority levels
+        priorityQueue = util.PriorityQueue()
+
+        # Assign predecessors to each state
+        for preds in predecessors:
+            if not self.mdp.isTerminal(preds):
+                possibleActions = self.mdp.getPossibleActions(preds)
+                for action in possibleActions:
+                    transitions = self.mdp.getTransitionStatesAndProbs(preds, action)
+                    for nextState, prob in transitions:
+                        if prob > 0:
+                            predecessors[nextState].add(preds)
+
+        # Get best qValue for each state in current iteration
+        for state in self.mdp.getStates():
+            bestQ = float('-inf')
+            if not self.mdp.isTerminal(state):
+                curStateVal = self.values[state]
+                actions = self.mdp.getPossibleActions(state)
+                qValues = [self.computeQValueFromValues(state, action) for action in actions]
+                if qValues:
+                    bestQ = max(qValues)
+                diff = abs(curStateVal - bestQ)
+                priorityQueue.push(state, -diff)
+
+        for i in range(self.iterations):
+            if priorityQueue.isEmpty():
+                return
+            else:
+                s = priorityQueue.pop()
+
+                # Update the values for state s
+                actions = self.mdp.getPossibleActions(s)
+                if actions:
+                    qValues = [self.computeQValueFromValues(s, action) for action in actions]
+                    self.values[s] = max(qValues)
+
+                for p in predecessors[s]:
+                    actions = self.mdp.getPossibleActions(p)
+                    qValues = [self.computeQValueFromValues(p, action) for action in actions]
+                    if qValues:
+                        bestQ = max(qValues)
+                    diff = abs(self.values[p] - bestQ)
+                    if (diff > self.theta):
+                        priorityQueue.update(p, -diff)
+
+
+
+
+
+
+            
+
 
